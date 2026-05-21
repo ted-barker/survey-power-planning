@@ -1,0 +1,21 @@
+# Python
+__pycache__/
+*.py[cod]
+.Python
+venv/
+*.egg-info/
+
+# Jupyter
+.ipynb_checkpoints/
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Outputs
+outputs/
+*.log
