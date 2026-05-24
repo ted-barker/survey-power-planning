@@ -2283,49 +2283,50 @@ def show_integrated_dashboard():
 
         if use_survey:
             st.markdown("")
-            ctr = st.slider(
-                "CTR (%)",
-                0.5, 100.0, 5.0, 0.5,
-                help="Click-Through Rate: % who click invitation link",
-                key="ctr_slider"
-            ) / 100
 
-            # CTR presets
+            # Initialize session state for sliders if not present
+            if 'ctr_slider' not in st.session_state:
+                st.session_state.ctr_slider = 5.0
+            if 'dropoff_slider' not in st.session_state:
+                st.session_state.dropoff_slider = 30
+
+            # CTR presets (before slider)
             col_ctr1, col_ctr2, col_ctr3 = st.columns(3)
             with col_ctr1:
                 if st.button("Low (2%)", key="ctr_low"):
                     st.session_state.ctr_slider = 2.0
-                    st.rerun()
             with col_ctr2:
                 if st.button("Med (5%)", key="ctr_med"):
                     st.session_state.ctr_slider = 5.0
-                    st.rerun()
             with col_ctr3:
                 if st.button("High (10%)", key="ctr_high"):
                     st.session_state.ctr_slider = 10.0
-                    st.rerun()
 
-            dropoff = st.slider(
-                "Drop-off (%)",
-                0, 60, 30, 1,
-                help="% who start but don't finish survey",
-                key="dropoff_slider"
+            ctr = st.slider(
+                "CTR (%)",
+                0.5, 100.0, st.session_state.ctr_slider, 0.5,
+                help="Click-Through Rate: % who click invitation link",
+                key="ctr_slider"
             ) / 100
 
-            # Drop-off presets
+            # Drop-off presets (before slider)
             col_d1, col_d2, col_d3 = st.columns(3)
             with col_d1:
                 if st.button("Low (15%)", key="drop_low"):
                     st.session_state.dropoff_slider = 15
-                    st.rerun()
             with col_d2:
                 if st.button("Med (25%)", key="drop_med"):
                     st.session_state.dropoff_slider = 25
-                    st.rerun()
             with col_d3:
                 if st.button("High (40%)", key="drop_high"):
                     st.session_state.dropoff_slider = 40
-                    st.rerun()
+
+            dropoff = st.slider(
+                "Drop-off (%)",
+                0, 60, st.session_state.dropoff_slider, 1,
+                help="% who start but don't finish survey",
+                key="dropoff_slider"
+            ) / 100
 
             completion_rate = 1 - dropoff
             st.markdown("")
