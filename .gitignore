@@ -19,3 +19,6 @@ Thumbs.db
 # Outputs
 outputs/
 *.log
+
+# SpecStory
+.specstory/
