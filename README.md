@@ -8,7 +8,7 @@ Single-page application showing mathematical relationships between survey effici
 
 ## Features
 
-- 📊 **Statistical Power Calculators** - 8 test types (t-test, ANOVA, regression, correlation, chi-square, proportions, segment analysis)
+- 📊 **Statistical Power Calculators** - 14 test types covering parametric, non-parametric, and regression models
 - 🔢 **Survey Sample Planning** - CTR and drop-off rate calculations
 - 🧮 **Visual Mathematics** - Equation showing how components multiply together
 - ⚡ **Real-Time Calculation** - Three-column layout with instant updates
@@ -83,9 +83,18 @@ CTR Multiplier × Drop-off Multiplier × Statistical Requirement = Total Invitat
 - **Paired t-test** - Before/after within same people
 - **ANOVA** - Compare 3+ groups
 
+### Non-Parametric (Rank-Based)
+- **Mann-Whitney U** - Compare 2 groups using ranks (alternative to t-test)
+- **Wilcoxon Signed-Rank** - Compare paired observations using ranks
+- **Kruskal-Wallis H** - Compare 3+ groups using ranks (alternative to ANOVA)
+- **Friedman Test** - Compare repeated measures using ranks
+
 ### Regression & Correlation
 - **Multiple Regression** - Predict from multiple variables
 - **Correlation** - Relationship between 2 variables
+- **Logistic Regression** - Predict yes/no outcomes
+- **Ordinal Regression** - Predict ordered categories (e.g., Likert scales)
+- **Multinomial Regression** - Predict unordered categories
 
 ### Proportions
 - **Chi-Square** - Association between categories

@@ -20,6 +20,8 @@ from src.power.calculators.means import MeansPowerCalc
 from src.power.calculators.regression import RegressionPowerCalc
 from src.power.calculators.proportions import ProportionsPowerCalc
 from src.power.calculators.segments import SegmentPowerCalc
+from src.power.calculators.nonparametric import NonParametricPowerCalc
+from src.power.calculators.logistic import LogisticPowerCalc
 from src.power.visualizations.power_curves import plot_power_curve, plot_sample_size_curve
 from src.power.visualizations.sensitivity import plot_sensitivity_analysis, create_segment_allocation_plot
 from src.power.integrations.dropoff import (
@@ -248,14 +250,13 @@ def show_calculator_interface():
                 "Logistic Regression (predict yes/no outcome)",
                 "Ordinal Regression (predict ordered categories)",
                 "Multinomial Regression (predict unordered categories)",
+                "Non-Parametric: Mann-Whitney U (2 groups, ranks)",
+                "Non-Parametric: Wilcoxon (paired, ranks)",
+                "Non-Parametric: Kruskal-Wallis (3+ groups, ranks)",
+                "Non-Parametric: Friedman (repeated measures, ranks)",
                 "Chi-Square (association between categories)",
                 "Proportions (compare percentages)",
-                "Non-Parametric Tests (rank-based comparisons)",
-                "Segment Analysis (compare pre-defined segments)",
-                "PCA/EFA (find underlying dimensions)",
-                "CFA (confirm factor structure)",
-                "LCA (identify latent classes)",
-                "Cluster Analysis (discover groups)"
+                "Segment Analysis (compare pre-defined segments)"
             ],
             help="Not sure which test? Use the Guided Agent instead"
         )
@@ -309,14 +310,13 @@ def show_calculator_interface():
         "Logistic Regression": "Predict yes/no outcome",
         "Ordinal Regression": "Predict ordered categories (e.g., Likert scales)",
         "Multinomial Regression": "Predict unordered categories",
+        "Non-Parametric: Mann-Whitney U": "Compare 2 groups using ranks (alternative to t-test)",
+        "Non-Parametric: Wilcoxon": "Compare paired observations using ranks",
+        "Non-Parametric: Kruskal-Wallis": "Compare 3+ groups using ranks (alternative to ANOVA)",
+        "Non-Parametric: Friedman": "Compare repeated measures using ranks",
         "Chi-Square": "Test association between categorical variables",
         "Proportions": "Compare percentages between groups",
-        "Non-Parametric Tests": "Rank-based comparisons (when assumptions violated)",
-        "Segment Analysis": "Compare outcomes across pre-defined segments",
-        "PCA/EFA": "Discover underlying dimensions in data",
-        "CFA": "Confirm hypothesized factor structure",
-        "LCA": "Identify latent classes/groups",
-        "Cluster Analysis": "Discover natural groupings in data"
+        "Segment Analysis": "Compare outcomes across pre-defined segments"
     }
 
     if base_test in test_descriptions:
@@ -1151,19 +1151,13 @@ Power: {result['power']:.1%} ({power_status})
                 help="Number of independent variables (e.g., age, income, usage, satisfaction = 4 predictors)"
             )
 
-            expected_prob = st.slider(
-                "Expected outcome probability",
-                0.05, 0.50, 0.15, 0.05,
-                help="Probability of the outcome occurring (e.g., 15% churn rate, 20% conversion rate). Use smaller of the two outcomes."
+            st.caption("Effect Size: Small=0.02 | Medium=0.15 | Large=0.35")
+            effect_size = st.slider(
+                "Effect size (f²)",
+                0.01, 0.50, 0.15, 0.01,
+                help="Cohen's f² for logistic regression. Small=0.02, Medium=0.15, Large=0.35"
             )
 
-            or_to_detect = st.slider(
-                "Odds ratio to detect",
-                1.1, 3.0, 1.5, 0.1,
-                help="Minimum odds ratio you want to detect. Small=1.2-1.5, Medium=1.5-2.5, Large=2.5+. 1.5 means 50% increase in odds."
-            )
-
-        with col2:
             alpha = st.selectbox(
                 "Significance Level (α)",
                 [0.01, 0.05, 0.10],
@@ -1172,44 +1166,74 @@ Power: {result['power']:.1%} ({power_status})
                 help="Probability of false positive. Standard is 0.05."
             )
 
-            power = st.slider(
-                "Statistical Power (% chance of detecting real effect)",
-                0.5, 0.99, 0.80, 0.01,
-                key="logit_power",
-                help="Probability of detecting real effect. Standard is 0.80 (80%)."
-            )
-
-            # Calculate events per variable (EPV)
-            epv = st.slider(
-                "Events per variable (EPV)",
-                5, 20, 10, 1,
-                help="Conservative: 20 EPV. Standard: 10 EPV. Minimum: 5-10 EPV. More EPV = more stable model."
-            )
+        with col2:
+            if solve_for == 'n':
+                power = st.slider(
+                    "Statistical Power (% chance of detecting real effect)",
+                    0.5, 0.99, 0.80, 0.01,
+                    key="logit_power",
+                    help="Probability of detecting real effect. Standard is 0.80 (80%)."
+                )
+            else:
+                sample_n = st.number_input(
+                    "Sample size",
+                    min_value=50, value=200, step=10,
+                    key="logit_sample",
+                    help="Current sample size to evaluate power"
+                )
 
         if st.button("Calculate", type="primary", key="logit_calc"):
-            # Calculate sample size
-            n_events = n_predictors * epv
-            total_n = int(n_events / expected_prob)
-
             st.markdown("---")
             st.subheader("Results")
-            st.success(f"**Required Sample Size:** {total_n:,} participants")
-            st.info(f"""
-            **Breakdown:**
-            • {n_events} events (outcomes) needed
-            • With {expected_prob:.0%} event rate → {total_n:,} total participants
-            • Events per variable: {epv}
 
-            **Rule of thumb:** Minimum 10 events per predictor variable
-            """)
+            with st.spinner("Calculating Sample Size..."):
+                calc = LogisticPowerCalc(test_type='binary')
 
-            st.warning("""
-            **Note:** This uses the Events Per Variable (EPV) rule.
-            For rare outcomes (<10%), consider:
-            • Increasing sample size
-            • Reducing number of predictors
-            • Using penalized regression (LASSO, Ridge)
-            """)
+                if solve_for == 'n':
+                    result = calc.calculate(
+                        effect_size=effect_size,
+                        alpha=alpha,
+                        power=power,
+                        solve_for='n',
+                        n_predictors=n_predictors
+                    )
+
+                    st.session_state['last_calculation'] = {
+                        'test': 'Binary Logistic Regression',
+                        'result': result,
+                        'solve_for': 'n',
+                        'n_predictors': n_predictors
+                    }
+
+                    st.success(f"**Required Sample Size:** {result['n']:,} participants")
+                    st.info(f"""
+                    **Rule of thumb:** {result['rule']}
+
+                    **Assumptions:** {result['assumptions']}
+                    """)
+
+                else:  # solve_for == 'power'
+                    result = calc.calculate(
+                        effect_size=effect_size,
+                        alpha=alpha,
+                        n=sample_n,
+                        solve_for='power',
+                        n_predictors=n_predictors
+                    )
+
+                    st.session_state['last_calculation'] = {
+                        'test': 'Binary Logistic Regression',
+                        'result': result,
+                        'solve_for': 'power',
+                        'sample_n': sample_n
+                    }
+
+                    if result['power'] >= 0.80:
+                        st.success(f"**Power:** {result['power']:.1%} ✓ Adequate")
+                    elif result['power'] >= 0.70:
+                        st.warning(f"**Power:** {result['power']:.1%} ⚠ Moderate")
+                    else:
+                        st.error(f"**Power:** {result['power']:.1%} ✗ Underpowered")
 
     elif base_test == "Ordinal Regression":
         st.info("""
@@ -1282,10 +1306,12 @@ Power: {result['power']:.1%} ({power_status})
                 st.success(f"✓ Categories sum to {total_pct}% (close enough)")
 
         with col2:
-            or_to_detect = st.slider(
-                "Odds ratio to detect",
-                1.1, 3.0, 1.5, 0.1,
-                help="Minimum odds ratio between adjacent categories. Small=1.2-1.5, Medium=1.5-2.5, Large=2.5+"
+            st.caption("Effect Size: Small=0.02 | Medium=0.15 | Large=0.35")
+            effect_size = st.slider(
+                "Effect size (f²)",
+                0.01, 0.50, 0.15, 0.01,
+                help="Cohen's f² for ordinal regression. Small=0.02, Medium=0.15, Large=0.35",
+                key="ord_effect"
             )
 
             alpha = st.selectbox(
@@ -1296,54 +1322,76 @@ Power: {result['power']:.1%} ({power_status})
                 help="Probability of false positive. Standard is 0.05."
             )
 
-            power = st.slider(
-                "Statistical Power (% chance of detecting real effect)",
-                0.5, 0.99, 0.80, 0.01,
-                key="ord_power",
-                help="Probability of detecting real effect. Standard is 0.80 (80%)."
-            )
-
-            epv = st.slider(
-                "Events per variable (EPV)",
-                5, 20, 10, 1,
-                help="Conservative: 20 EPV. Standard: 10 EPV. Minimum: 5-10 EPV."
-            )
+            if solve_for == 'n':
+                power = st.slider(
+                    "Statistical Power (% chance of detecting real effect)",
+                    0.5, 0.99, 0.80, 0.01,
+                    key="ord_power",
+                    help="Probability of detecting real effect. Standard is 0.80 (80%)."
+                )
+            else:
+                sample_n = st.number_input(
+                    "Sample size",
+                    min_value=50, value=200, step=10,
+                    key="ord_sample",
+                    help="Current sample size to evaluate power"
+                )
 
         # Disable calculate if percentages invalid
         if st.button("Calculate", type="primary", key="ord_calc", disabled=not pct_valid):
-            # Find smallest category
-            min_category_pct = min(categories_dist) / 100
-
-            # Ordinal regression estimates (k-1) thresholds + p slopes
-            # where k = number of categories, p = number of predictors
-            n_parameters = (n_categories - 1) + n_predictors
-
-            # Need EPV for smallest category (most conservative)
-            n_smallest_category = n_predictors * epv
-            total_n = int(n_smallest_category / min_category_pct)
-
             st.markdown("---")
             st.subheader("Results")
-            st.success(f"**Required Sample Size:** {total_n:,} participants")
 
-            st.info(f"""
-            **Breakdown:**
-            • Parameters estimated: {n_parameters} ({n_categories-1} thresholds + {n_predictors} slopes)
-            • Smallest category: {min(categories_dist)}% = {int(total_n * min_category_pct)} participants
-            • Events per variable: {epv}
-            • Recommended minimum per category: {int(total_n / n_categories)} participants
+            with st.spinner("Calculating Sample Size..."):
+                calc = LogisticPowerCalc(test_type='ordinal')
 
-            **Distribution across categories:**
-            {chr(10).join([f"  • Category {i+1}: {int(total_n * pct/100):,} ({pct}%)" for i, pct in enumerate(categories_dist)])}
-            """)
+                if solve_for == 'n':
+                    result = calc.calculate(
+                        effect_size=effect_size,
+                        alpha=alpha,
+                        power=power,
+                        solve_for='n',
+                        n_predictors=n_predictors,
+                        n_categories=n_categories
+                    )
 
-            st.warning("""
-            **Important considerations:**
-            • Proportional odds assumption: Effect of predictor is same across all thresholds
-            • If violated, may need partial proportional odds or multinomial logistic regression
-            • Smaller categories need more total sample to ensure stability
-            • Minimum 10 events per predictor in smallest category
-            """)
+                    st.session_state['last_calculation'] = {
+                        'test': 'Ordinal Logistic Regression',
+                        'result': result,
+                        'solve_for': 'n',
+                        'n_predictors': n_predictors
+                    }
+
+                    st.success(f"**Required Sample Size:** {result['n']:,} participants")
+                    st.info(f"""
+                    **Rule of thumb:** {result['rule']}
+
+                    **Assumptions:** {result['assumptions']}
+                    """)
+
+                else:  # solve_for == 'power'
+                    result = calc.calculate(
+                        effect_size=effect_size,
+                        alpha=alpha,
+                        n=sample_n,
+                        solve_for='power',
+                        n_predictors=n_predictors,
+                        n_categories=n_categories
+                    )
+
+                    st.session_state['last_calculation'] = {
+                        'test': 'Ordinal Logistic Regression',
+                        'result': result,
+                        'solve_for': 'power',
+                        'sample_n': sample_n
+                    }
+
+                    if result['power'] >= 0.80:
+                        st.success(f"**Power:** {result['power']:.1%} ✓ Adequate")
+                    elif result['power'] >= 0.70:
+                        st.warning(f"**Power:** {result['power']:.1%} ⚠ Moderate")
+                    else:
+                        st.error(f"**Power:** {result['power']:.1%} ✗ Underpowered")
 
     elif base_test == "Multinomial Regression":
         st.info("""
@@ -1415,6 +1463,14 @@ Power: {result['power']:.1%} ({power_status})
                 st.success(f"✓ Outcomes sum to {total_pct}% (close enough)")
 
         with col2:
+            st.caption("Effect Size: Small=0.02 | Medium=0.15 | Large=0.35")
+            effect_size = st.slider(
+                "Effect size (f²)",
+                0.01, 0.50, 0.15, 0.01,
+                help="Cohen's f² for multinomial regression. Small=0.02, Medium=0.15, Large=0.35",
+                key="multi_effect"
+            )
+
             alpha = st.selectbox(
                 "Significance Level (α)",
                 [0.01, 0.05, 0.10],
@@ -1423,66 +1479,79 @@ Power: {result['power']:.1%} ({power_status})
                 help="Probability of false positive. Standard is 0.05."
             )
 
-            power = st.slider(
-                "Statistical Power (% chance of detecting real effect)",
-                0.5, 0.99, 0.80, 0.01,
-                key="multi_power",
-                help="Probability of detecting real effect. Standard is 0.80 (80%)."
-            )
-
-            epv = st.slider(
-                "Events per variable (EPV)",
-                10, 20, 15, 1,
-                help="Multinomial needs MORE data than binary logistic. Conservative: 20 EPV. Standard: 15 EPV."
-            )
+            if solve_for == 'n':
+                power = st.slider(
+                    "Statistical Power (% chance of detecting real effect)",
+                    0.5, 0.99, 0.80, 0.01,
+                    key="multi_power",
+                    help="Probability of detecting real effect. Standard is 0.80 (80%)."
+                )
+            else:
+                sample_n = st.number_input(
+                    "Sample size",
+                    min_value=100, value=300, step=20,
+                    key="multi_sample",
+                    help="Current sample size to evaluate power"
+                )
 
         # Disable calculate if percentages invalid
         if st.button("Calculate", type="primary", key="multi_calc", disabled=not outcomes_valid):
-            # Multinomial estimates (k-1) equations × p predictors
-            # where k = number of outcomes, p = number of predictors
-            n_comparisons = n_outcomes - 1  # One category is reference
-            total_parameters = n_comparisons * n_predictors
-
-            # Find smallest outcome category
-            min_outcome_pct = min(outcomes_dist) / 100
-
-            # Need EPV for smallest outcome (most conservative)
-            # Each comparison needs EPV events
-            n_smallest_outcome = n_predictors * epv
-            total_n = int(n_smallest_outcome / min_outcome_pct)
-
-            # Additional adjustment: multinomial needs more data due to multiple comparisons
-            total_n = int(total_n * 1.2)  # 20% increase for multinomial complexity
-
             st.markdown("---")
             st.subheader("Results")
-            st.success(f"**Required Sample Size:** {total_n:,} participants")
 
-            st.info(f"""
-            **Breakdown:**
-            • Comparisons: {n_comparisons} (each outcome vs. reference category)
-            • Total parameters: {total_parameters} ({n_comparisons} equations × {n_predictors} predictors)
-            • Smallest outcome: {min(outcomes_dist)}% = {int(total_n * min_outcome_pct)} participants
-            • Events per variable: {epv}
-            • 20% increase for multinomial complexity included
+            with st.spinner("Calculating Sample Size..."):
+                calc = LogisticPowerCalc(test_type='multinomial')
 
-            **Distribution across outcomes:**
-            {chr(10).join([f"  • Outcome {i+1}: {int(total_n * pct/100):,} ({pct}%)" for i, pct in enumerate(outcomes_dist)])}
-            """)
+                if solve_for == 'n':
+                    result = calc.calculate(
+                        effect_size=effect_size,
+                        alpha=alpha,
+                        power=power,
+                        solve_for='n',
+                        n_predictors=n_predictors,
+                        n_categories=n_outcomes
+                    )
 
-            st.warning("""
-            **Important considerations:**
-            • More outcomes = More parameters = More sample needed
-            • Each outcome is compared to reference category
-            • Smallest outcome drives sample size requirements
-            • Consider combining rare categories if <10% of sample
-            • For ordered outcomes, use ordinal regression instead (more efficient)
+                    st.session_state['last_calculation'] = {
+                        'test': 'Multinomial Logistic Regression',
+                        'result': result,
+                        'solve_for': 'n',
+                        'n_predictors': n_predictors
+                    }
 
-            **Alternative if sample is limited:**
-            • Reduce number of predictors
-            • Combine rare outcome categories
-            • Use regularization (penalized regression)
-            """)
+                    st.success(f"**Required Sample Size:** {result['n']:,} participants")
+                    st.info(f"""
+                    **Rule of thumb:** {result['rule']}
+
+                    **Assumptions:** {result['assumptions']}
+
+                    **Note:** Multinomial regression requires more sample than binary or ordinal
+                    due to estimating (k-1) comparisons simultaneously.
+                    """)
+
+                else:  # solve_for == 'power'
+                    result = calc.calculate(
+                        effect_size=effect_size,
+                        alpha=alpha,
+                        n=sample_n,
+                        solve_for='power',
+                        n_predictors=n_predictors,
+                        n_categories=n_outcomes
+                    )
+
+                    st.session_state['last_calculation'] = {
+                        'test': 'Multinomial Logistic Regression',
+                        'result': result,
+                        'solve_for': 'power',
+                        'sample_n': sample_n
+                    }
+
+                    if result['power'] >= 0.80:
+                        st.success(f"**Power:** {result['power']:.1%} ✓ Adequate")
+                    elif result['power'] >= 0.70:
+                        st.warning(f"**Power:** {result['power']:.1%} ⚠ Moderate")
+                    else:
+                        st.error(f"**Power:** {result['power']:.1%} ✗ Underpowered")
 
     elif base_test == "Chi-Square":
         st.info("""
@@ -1577,21 +1646,45 @@ Power: {result['power']:.1%} ({power_status})
         • Larger tables (many cells) require much larger samples
         """)
 
-    elif base_test == "Non-Parametric Tests":
-        st.info("""
-        **Non-Parametric Tests** - When data violates parametric assumptions
+    elif base_test in ["Non-Parametric: Mann-Whitney U", "Non-Parametric: Wilcoxon",
+                        "Non-Parametric: Kruskal-Wallis", "Non-Parametric: Friedman"]:
 
-        Use when: Ordinal data, skewed distributions, small samples, or violated assumptions
+        # Determine test type
+        if "Mann-Whitney" in base_test:
+            test_type = 'mann_whitney'
+            test_name = "Mann-Whitney U Test"
+            desc = "Non-parametric alternative to independent t-test (compare 2 groups using ranks)"
+            parametric_equiv = "Independent t-test"
+        elif "Wilcoxon" in base_test:
+            test_type = 'wilcoxon'
+            test_name = "Wilcoxon Signed-Rank Test"
+            desc = "Non-parametric alternative to paired t-test (compare matched pairs using ranks)"
+            parametric_equiv = "Paired t-test"
+        elif "Kruskal-Wallis" in base_test:
+            test_type = 'kruskal_wallis'
+            test_name = "Kruskal-Wallis H Test"
+            desc = "Non-parametric alternative to ANOVA (compare 3+ groups using ranks)"
+            parametric_equiv = "One-way ANOVA"
+        else:  # Friedman
+            test_type = 'friedman'
+            test_name = "Friedman Test"
+            desc = "Non-parametric alternative to repeated measures ANOVA (compare repeated measures using ranks)"
+            parametric_equiv = "Repeated measures ANOVA"
+
+        st.info(f"""
+        **{test_name}** - {desc}
+
+        **Parametric equivalent:** {parametric_equiv}
+
+        **When to use:**
+        • Ordinal data (e.g., Likert scales without assuming intervals)
+        • Severely skewed distributions
+        • Outliers that can't be removed
+        • Violated parametric assumptions
         """)
 
-        test_subtype = st.selectbox(
-            "Select non-parametric test:",
-            ["Mann-Whitney U (2 groups)", "Kruskal-Wallis (3+ groups)", "Wilcoxon Signed-Rank (paired)", "Friedman (repeated measures)"],
-            help="Choose based on your design: independent groups, paired data, or repeated measures"
-        )
-
         with col1:
-            if "Kruskal-Wallis" in test_subtype or "Friedman" in test_subtype:
+            if test_type in ['kruskal_wallis', 'friedman']:
                 n_groups = st.number_input(
                     "Number of groups",
                     min_value=3, value=3, step=1,
@@ -1600,85 +1693,103 @@ Power: {result['power']:.1%} ({power_status})
             else:
                 n_groups = 2
 
-            effect_size = st.slider(
-                "Effect size (0.1=small, 0.3=medium, 0.5=large)",
-                0.1, 0.8, 0.5, 0.05,
-                help="Rank-biserial / epsilon². Small=0.1-0.3, Medium=0.3-0.5, Large=0.5+. Effect size for rank-based tests."
-            )
+            # Effect size - use Cohen's d scale for consistency
+            if test_type in ['mann_whitney', 'wilcoxon']:
+                st.caption("Effect Size (Cohen's d): Small=0.2 | Medium=0.5 | Large=0.8")
+                effect_size = st.slider(
+                    "Effect Size (Cohen's d)",
+                    0.1, 1.5, 0.5, 0.05,
+                    help="Same scale as parametric tests. Small=0.2, Medium=0.5, Large=0.8"
+                )
+            else:  # kruskal_wallis, friedman
+                st.caption("Effect Size (Cohen's f): Small=0.1 | Medium=0.25 | Large=0.4")
+                effect_size = st.slider(
+                    "Effect Size (Cohen's f)",
+                    0.1, 1.0, 0.25, 0.05,
+                    help="Same scale as ANOVA. Small=0.1, Medium=0.25, Large=0.4"
+                )
 
             alpha = st.selectbox(
                 "Significance Level (α)",
                 [0.01, 0.05, 0.10],
                 index=1,
-                key="nonpar_alpha",
+                key=f"{test_type}_alpha",
                 help="Probability of false positive. Standard is 0.05."
             )
 
         with col2:
-            power = st.slider(
-                "Statistical Power (% chance of detecting real effect)",
-                0.5, 0.99, 0.80, 0.01,
-                key="nonpar_power",
-                help="Probability of detecting real effect. Standard is 0.80 (80%)."
-            )
+            if solve_for == 'n':
+                power = st.slider(
+                    "Statistical Power (% chance of detecting real effect)",
+                    0.5, 0.99, 0.80, 0.01,
+                    key=f"{test_type}_power",
+                    help="Probability of detecting real effect. Standard is 0.80 (80%)."
+                )
+            else:
+                sample_n = st.number_input(
+                    "Sample size per group",
+                    min_value=10, value=50, step=5,
+                    key=f"{test_type}_sample",
+                    help="Current sample size to evaluate power"
+                )
 
-            efficiency = st.slider(
-                "Asymptotic Relative Efficiency (ARE)",
-                0.64, 1.00, 0.95, 0.01,
-                help="Efficiency vs. parametric test. Mann-Whitney vs t-test: ~0.95. Kruskal-Wallis vs ANOVA: ~0.95. Use 0.95 unless you know otherwise."
-            )
+        if st.button("Calculate", type="primary", key=f"{test_type}_calc"):
+            st.markdown("---")
+            st.subheader("Results")
 
-        # Calculate using parametric equivalent then adjust for efficiency
-        if n_groups == 2:
-            calc = MeansPowerCalc(test_type='independent')
-            result = calc.calculate(
-                effect_size=effect_size,
-                alpha=alpha,
-                power=power,
-                solve_for='n'
-            )
-            parametric_n = result['n_per_group']
-        else:
-            calc = MeansPowerCalc(test_type='anova')
-            result = calc.calculate(
-                effect_size=effect_size,
-                alpha=alpha,
-                power=power,
-                solve_for='n',
-                n_groups=n_groups
-            )
-            parametric_n = result['n_per_group']
+            with st.spinner("Calculating Sample Size..."):
+                calc = NonParametricPowerCalc(test_type=test_type)
 
-        # Adjust for efficiency
-        nonparametric_n = int(parametric_n / efficiency)
+                if solve_for == 'n':
+                    result = calc.calculate(
+                        effect_size=effect_size,
+                        alpha=alpha,
+                        power=power,
+                        solve_for='n',
+                        n_groups=n_groups if test_type in ['kruskal_wallis', 'friedman'] else None
+                    )
 
-        if n_groups == 2:
-            total_n = nonparametric_n * 2
-            st.success(f"**Required Sample Size:** {nonparametric_n} per group ({total_n} total)")
-        else:
-            total_n = nonparametric_n * n_groups
-            st.success(f"**Required Sample Size:** {nonparametric_n} per group ({total_n} total)")
+                    st.session_state['last_calculation'] = {
+                        'test': test_name,
+                        'result': result,
+                        'solve_for': 'n'
+                    }
 
-        st.info(f"""
-        **Calculation method:**
-        • Parametric equivalent: {parametric_n} per group
-        • Efficiency adjustment: ÷ {efficiency:.2f}
-        • Non-parametric sample: {nonparametric_n} per group
+                    if 'n_per_group' in result:
+                        st.success(f"**Required Sample Size:** {result['n_per_group']:,} per group ({result['total_n']:,} total)")
+                    else:
+                        st.success(f"**Required Sample Size:** {result['n']:,} participants")
 
-        **Note:** Non-parametric tests are typically 95% as efficient as parametric tests
-        when assumptions are met, meaning you need ~5% more participants.
-        """)
+                    st.info(f"""
+                    **Efficiency vs {result['parametric_equivalent']}:**
+                    {result['efficiency']}
 
-        st.warning("""
-        **When to use non-parametric:**
-        • Ordinal data (e.g., Likert scales without assuming interval)
-        • Severely skewed distributions
-        • Outliers that can't be removed
-        • Small samples where normality can't be verified
-        • Violated parametric assumptions
+                    **When to use non-parametric:**
+                    {result['note']}
+                    """)
 
-        **If assumptions ARE met:** Parametric tests are more powerful (need fewer participants)
-        """)
+                else:  # solve_for == 'power'
+                    result = calc.calculate(
+                        effect_size=effect_size,
+                        alpha=alpha,
+                        n=sample_n,
+                        solve_for='power',
+                        n_groups=n_groups if test_type in ['kruskal_wallis', 'friedman'] else None
+                    )
+
+                    st.session_state['last_calculation'] = {
+                        'test': test_name,
+                        'result': result,
+                        'solve_for': 'power',
+                        'sample_n': sample_n
+                    }
+
+                    if result['power'] >= 0.80:
+                        st.success(f"**Power:** {result['power']:.1%} ✓ Adequate")
+                    elif result['power'] >= 0.70:
+                        st.warning(f"**Power:** {result['power']:.1%} ⚠ Moderate")
+                    else:
+                        st.error(f"**Power:** {result['power']:.1%} ✗ Underpowered")
 
     elif base_test == "Proportions":
         with col1:
