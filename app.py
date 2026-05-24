@@ -2349,7 +2349,14 @@ def show_integrated_dashboard():
                     "Independent t-test",
                     "Paired t-test",
                     "ANOVA",
+                    "Mann-Whitney U",
+                    "Wilcoxon",
+                    "Kruskal-Wallis",
+                    "Friedman",
                     "Multiple Regression",
+                    "Logistic Regression",
+                    "Ordinal Regression",
+                    "Multinomial Regression",
                     "Correlation",
                     "Chi-Square",
                     "Proportions",
@@ -2360,10 +2367,10 @@ def show_integrated_dashboard():
             )
 
             # Effect size based on test
-            if "t-test" in test_type:
+            if "t-test" in test_type or test_type in ["Mann-Whitney U", "Wilcoxon"]:
                 effect_label = "Effect (d)"
                 effect_options = {"Small (0.2)": 0.2, "Medium (0.5)": 0.5, "Large (0.8)": 0.8}
-            elif test_type == "ANOVA" or test_type == "Segment Analysis":
+            elif test_type in ["ANOVA", "Kruskal-Wallis", "Friedman", "Segment Analysis"]:
                 effect_label = "Effect (f)"
                 effect_options = {"Small (0.1)": 0.1, "Medium (0.25)": 0.25, "Large (0.4)": 0.4}
             elif "Regression" in test_type or test_type == "Correlation":
@@ -2398,9 +2405,10 @@ def show_integrated_dashboard():
             # Additional parameters
             n_groups = 2
             n_predictors = 3
+            n_categories = 5
             segment_prevalence = None
 
-            if test_type == "ANOVA" or test_type == "Segment Analysis":
+            if test_type in ["ANOVA", "Kruskal-Wallis", "Friedman", "Segment Analysis"]:
                 n_groups = st.number_input("Groups", min_value=3, value=3, step=1, key="groups_input")
                 if test_type == "Segment Analysis":
                     st.caption("Enter prevalence (must sum to 100%)")
@@ -2409,8 +2417,11 @@ def show_integrated_dashboard():
                         prev = st.number_input(f"Segment {i+1} %", min_value=1, max_value=100, value=int(100/n_groups), key=f"prev_{i}")
                         prevalence_inputs.append(prev/100)
                     segment_prevalence = prevalence_inputs
-            elif test_type == "Multiple Regression":
+            elif test_type in ["Multiple Regression", "Logistic Regression"]:
                 n_predictors = st.number_input("Predictors", min_value=1, value=3, step=1, key="pred_input")
+            elif test_type in ["Ordinal Regression", "Multinomial Regression"]:
+                n_predictors = st.number_input("Predictors", min_value=1, value=3, step=1, key="pred_input_ord")
+                n_categories = st.number_input("Categories", min_value=3, value=5 if test_type == "Ordinal Regression" else 4, step=1, key="cat_input")
         else:
             test_type = None
             required_sample = 100  # Default if no stats
@@ -2461,6 +2472,41 @@ def show_integrated_dashboard():
                 result = calc.calculate(effect_size=effect_size, alpha=alpha, power=power, solve_for='n')
                 required_sample = result['total_n']
                 detail = "2 groups"
+            elif test_type == "Mann-Whitney U":
+                calc = NonParametricPowerCalc(test_type='mann_whitney')
+                result = calc.calculate(effect_size=effect_size, alpha=alpha, power=power, solve_for='n')
+                required_sample = result['total_n']
+                detail = f"{result['n_per_group']:,} per group"
+            elif test_type == "Wilcoxon":
+                calc = NonParametricPowerCalc(test_type='wilcoxon')
+                result = calc.calculate(effect_size=effect_size, alpha=alpha, power=power, solve_for='n')
+                required_sample = result['n']
+                detail = "paired observations"
+            elif test_type == "Kruskal-Wallis":
+                calc = NonParametricPowerCalc(test_type='kruskal_wallis')
+                result = calc.calculate(effect_size=effect_size, alpha=alpha, power=power, solve_for='n', n_groups=n_groups)
+                required_sample = result['total_n']
+                detail = f"{result['n_per_group']:,} per group"
+            elif test_type == "Friedman":
+                calc = NonParametricPowerCalc(test_type='friedman')
+                result = calc.calculate(effect_size=effect_size, alpha=alpha, power=power, solve_for='n', n_groups=n_groups)
+                required_sample = result['n']
+                detail = f"{n_groups} repeated measures"
+            elif test_type == "Logistic Regression":
+                calc = LogisticPowerCalc(test_type='binary')
+                result = calc.calculate(effect_size=effect_size, alpha=alpha, power=power, solve_for='n', n_predictors=n_predictors)
+                required_sample = result['n']
+                detail = f"{n_predictors} predictors"
+            elif test_type == "Ordinal Regression":
+                calc = LogisticPowerCalc(test_type='ordinal')
+                result = calc.calculate(effect_size=effect_size, alpha=alpha, power=power, solve_for='n', n_predictors=n_predictors, n_categories=n_categories)
+                required_sample = result['n']
+                detail = f"{n_predictors} predictors, {n_categories} categories"
+            elif test_type == "Multinomial Regression":
+                calc = LogisticPowerCalc(test_type='multinomial')
+                result = calc.calculate(effect_size=effect_size, alpha=alpha, power=power, solve_for='n', n_predictors=n_predictors, n_categories=n_categories)
+                required_sample = result['n']
+                detail = f"{n_predictors} predictors, {n_categories} categories"
             elif test_type == "Segment Analysis":
                 calc = SegmentPowerCalc(n_segments=n_groups, prevalence=segment_prevalence)
                 result = calc.calculate(
