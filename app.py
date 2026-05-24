@@ -2381,23 +2381,24 @@ def show_integrated_dashboard():
                 effect_label = "Effect (w)"
                 effect_options = {"Small (0.1)": 0.1, "Medium (0.3)": 0.3, "Large (0.5)": 0.5}
 
-            # Effect size buttons
+            # Initialize effect_select if not present
+            if 'effect_select' not in st.session_state:
+                st.session_state.effect_select = 1  # Default to Medium
+
+            # Effect size buttons (before selectbox)
             col_e1, col_e2, col_e3 = st.columns(3)
             effect_keys = list(effect_options.keys())
             with col_e1:
                 if st.button("Small", key="effect_small"):
                     st.session_state.effect_select = 0
-                    st.rerun()
             with col_e2:
                 if st.button("Medium", key="effect_med"):
                     st.session_state.effect_select = 1
-                    st.rerun()
             with col_e3:
                 if st.button("Large", key="effect_large"):
                     st.session_state.effect_select = 2
-                    st.rerun()
 
-            effect_idx = st.session_state.get('effect_select', 1)
+            effect_idx = st.session_state.effect_select
             effect_size_option = st.selectbox(effect_label, effect_keys, index=effect_idx, key="effect_size_select")
             effect_size = effect_options[effect_size_option]
 
