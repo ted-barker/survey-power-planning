@@ -1,8 +1,19 @@
-# Survey Fatigue Audit
+# Survey & Statistical Power Planning
 
-**Analyze Qualtrics surveys for cognitive fatigue risk using evidence-based scoring.**
+**Interactive dashboard for calculating statistical power requirements and survey sample size planning.**
 
-Detects BIBD, skip logic, loops, grids, and position effects. Get actionable recommendations before launch.
+Single-page application showing mathematical relationships between survey efficiency and statistical power.
+
+---
+
+## Features
+
+- 📊 **Statistical Power Calculators** - 8 test types (t-test, ANOVA, regression, correlation, chi-square, proportions, segment analysis)
+- 🔢 **Survey Sample Planning** - CTR and drop-off rate calculations
+- 🧮 **Visual Mathematics** - Equation showing how components multiply together
+- ⚡ **Real-Time Calculation** - Three-column layout with instant updates
+- 🎛️ **Quick Presets** - Small/Medium/Large effect size buttons
+- 🎨 **Professional UI** - Clean design with Plotly visualizations
 
 ---
 
@@ -12,411 +23,285 @@ Detects BIBD, skip logic, loops, grids, and position effects. Get actionable rec
 
 ```bash
 # Clone repository
-git clone https://github.com/ted-barker/survey-fatigue-audit.git
-cd survey-fatigue-audit
+git clone https://github.com/ted-barker/survey-power-planning.git
+cd survey-power-planning
 
 # Install dependencies
 pip install -r requirements.txt
 ```
 
-### 2. Test with Example
+### 2. Launch Dashboard
 
 ```bash
-# Analyze the included example survey
-python analyze_survey.py data/sample-surveys/Bold_Claims_2AFC_BIBD.qsf
+streamlit run app.py
 ```
 
-**You'll see:**
-- Visual scoring explanation (0-100 scale)
-- Score: 2.3/100 (LOW RISK)
-- Time estimate: 3-6 minutes
-- Detailed breakdown by category
-- Specific recommendations
+The dashboard will open in your browser at `http://localhost:8501`
 
-### 3. Analyze Your Survey
+---
 
-```bash
-# Export your survey from Qualtrics as .qsf file
-# Place it in data/sample-surveys/
-# Run analysis
+## How It Works
 
-python analyze_survey.py data/sample-surveys/your-survey.qsf
+The dashboard calculates how many survey invitations you need to send based on:
+
+### Three Components
+
+**1. Survey Sample (Column 1)**
+- CTR (Click-Through Rate): % who click your invitation link
+- Drop-off Rate: % who start but don't finish
+- Calculates overall conversion rate
+
+**2. Statistical Power (Column 2)**
+- Select test type (t-test, ANOVA, regression, etc.)
+- Choose effect size (Small/Medium/Large)
+- Set desired power (typically 80%)
+- Calculates required sample size
+
+**3. Final Estimate (Column 3)**
+- Shows total invitations needed
+- Displays expected sample size
+- Shows conversion rate
+
+### The Math
+
 ```
+CTR Multiplier × Drop-off Multiplier × Statistical Requirement = Total Invitations
+```
+
+**Example:**
+- CTR: 5% (×20 multiplier)
+- Drop-off: 30% (×1.43 multiplier)
+- Statistical requirement: 128 participants
+- **Result: 128 × 20 × 1.43 = 3,657 invitations**
+
+---
+
+## Statistical Tests Supported
+
+### Comparing Means
+- **Independent t-test** - Compare 2 groups
+- **Paired t-test** - Before/after within same people
+- **ANOVA** - Compare 3+ groups
+
+### Regression & Correlation
+- **Multiple Regression** - Predict from multiple variables
+- **Correlation** - Relationship between 2 variables
+
+### Proportions
+- **Chi-Square** - Association between categories
+- **Proportions** - Compare percentages
+
+### Advanced
+- **Segment Analysis** - Compare pre-defined segments (e.g., personas) with known prevalence
 
 ---
 
 ## Usage Examples
 
-### Analyze Single Survey
+### Example 1: A/B Test Planning
 
-```bash
-python analyze_survey.py my-survey.qsf
-```
-
-**Output includes:**
-- Score (0-100 points, lower = better)
-- Risk level (LOW/MODERATE/HIGH/EXTREME)
-- Time estimate (minutes)
-- Expected drop-off rate
-- Issue breakdown by severity
-- Specific recommendations
-
-### Compare Multiple Surveys
-
-```bash
-python analyze_survey.py survey1.qsf survey2.qsf survey3.qsf --compare
-```
-
-**Shows:**
-- Side-by-side comparison table
-- All surveys sorted by score (best to worst)
-- Time and drop-off for each
-
-### Executive Summary
-
-```bash
-python analyze_survey.py *.qsf --executive
-```
-
-**Shows:**
-- Count by risk level
-- One-line recommendation per survey
-- Quick prioritization for stakeholders
-
-### View Scoring System
-
-```bash
-python analyze_survey.py --explain
-```
-
-**Shows:**
-- Visual 0-100 scale explanation
-- Risk level definitions
-- What each level means
-
-## What You Get
-
-### Fatigue Score (0-100)
-
-**IMPORTANT: Lower score = Better design = Less fatigue**
+**Scenario:** Test two design variants
 
 ```
- 0 ─────── 25 ─────── 50 ─────── 75 ─────── 100
- │          │          │          │          │
-LOW      MODERATE    HIGH      EXTREME   CATASTROPHIC
-✅         ⚠️         🔴         ❌         💀
+Survey Sample:
+- CTR: 5% (email with incentive)
+- Drop-off: 25% (standard survey)
+- Conversion: 3.75%
+
+Statistical Power:
+- Test: Independent t-test
+- Effect: Medium (0.5)
+- Power: 80%
+- Required: 128 participants
+
+Final Estimate:
+- Send 3,413 invitations
+- Expect 128 completions
 ```
 
-- **0-25:** ✅ LOW RISK - Launch immediately
-- **26-50:** ⚠️ MODERATE RISK - Review and optimize
-- **51-75:** 🔴 HIGH RISK - Redesign required
-- **76-100:** ❌ EXTREME RISK - Complete overhaul
+### Example 2: Segment Comparison
 
-### Category Breakdown
-
-See exactly where fatigue comes from:
-- **Loop Penalty** - Repeated question blocks
-- **Cluster Penalty** - High-load questions grouped together
-- **Position Penalty** - High-load questions late in survey
-- **Grid Complexity** - Large matrix questions
-- **Attention Checks** - Validation in fatigue zones
-- **Skip Logic Bonus** - Effective question reduction
-
-### Specific Issues
-
-Each problem flagged with:
-- Severity (Critical / High / Medium / Low)
-- Question position
-- Impact on score
-- Fix recommendation
-
-### Time & Drop-Off Estimates
-
-- Estimated completion time (min-max range)
-- Expected drop-off rate
-- Effective sample size after fatigue
-
-## What It Detects
-
-### 🔴 Critical Issues
-
-1. **Loops with 5+ iterations** (especially with open-ended questions)
-2. **Open-ended questions inside loops**
-3. **Matrix grids exceeding 50 cells**
-4. **4+ high-load questions in sequence**
-
-### ⚠️ High Priority Issues
-
-5. **Loops with 3-4 iterations**
-6. **Large grids (35-50 cells)**
-7. **High-load questions in late survey positions (Q31+)**
-8. **3+ high-load questions clustered**
-9. **Attention checks after loop 2 or Q20+**
-
-### 🟡 Medium Priority Issues
-
-10. **Grids with 20-35 cells**
-11. **High-load questions in mid-survey fatigue zone (Q21-30)**
-12. **Missing skip logic opportunities**
-13. **Back-to-back multi-select questions**
-
-## Understanding Your Results
-
-### Example Output
+**Scenario:** Compare 3 user personas (40%/40%/20% split)
 
 ```
-╔══════════════════════════════════════════════════════════════════════════╗
-║                     SURVEY FATIGUE SCORING SYSTEM                        ║
-╚══════════════════════════════════════════════════════════════════════════╝
+Survey Sample:
+- CTR: 8% (in-app survey)
+- Drop-off: 20% (short survey)
+- Conversion: 6.4%
 
- 0 ─────── 25 ─────── 50 ─────── 75 ─────── 100
- │          │          │          │          │
-LOW      MODERATE    HIGH      EXTREME   CATASTROPHIC
-✅         ⚠️         🔴         ❌         💀
+Statistical Power:
+- Test: Segment Analysis
+- 3 segments: 40%, 40%, 20%
+- Effect: Medium (0.25)
+- Power: 80%
+- Required: 159 participants
 
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-SCORE: 2.3/100 points
-RISK LEVEL: ✅ LOW
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-INTERPRETATION: Excellent design, minimal fatigue → Launch immediately
-
-Estimated time: 3-6 minutes
-Expected drop-off: 10.0%
-
-SCORE BREAKDOWN:
-+ Base Load: 2.3 points
-  └─ Cognitive load per respondent (BIBD: 14 effective questions)
-+ Position Penalty: 0.0 points
-+ Grid Complexity: 0.0 points
-
-✅ NO ISSUES DETECTED
+Final Estimate:
+- Send 2,484 invitations
+- Expect 159 completions (64/64/32 per segment)
 ```
 
-### What the Score Means
+### Example 3: Regression Study
 
-**Lower score = Better design = Less fatigue**
+**Scenario:** Predict satisfaction from 5 factors
 
-- **Score 2.3** means 2.3% of maximum possible fatigue
-- **97.7% better** than worst possible design
-- **Excellent** survey ready to launch
+```
+Survey Sample:
+- CTR: 3% (cold email list)
+- Drop-off: 35% (complex survey)
+- Conversion: 1.95%
 
-### When to Be Concerned
+Statistical Power:
+- Test: Multiple Regression
+- Predictors: 5
+- Effect: Medium (0.15)
+- Power: 80%
+- Required: 92 participants
 
-| Your Score | What It Means | Action |
-|------------|---------------|--------|
-| **0-25** | ✅ Excellent to good | Launch immediately or with minor tweaks |
-| **26-50** | ⚠️ Acceptable but improvable | Review recommendations, optimize before launch |
-| **51-75** | 🔴 Problematic | Major revisions required before launch |
-| **76-100** | ❌ Severe issues | Complete redesign needed |
+Final Estimate:
+- Send 4,718 invitations
+- Expect 92 completions
+```
 
 ---
 
-## What The Tool Detects
+## Understanding the Results
 
-### Advanced Survey Techniques
+### CTR (Click-Through Rate)
 
-**BIBD Detection** ✅
-- Detects Balanced Incomplete Block Design
-- Scores based on questions per respondent, not total questions
-- Example: 58 questions → 14 per respondent → Score 2.3 (excellent)
+**Typical ranges:**
+- No incentive: ~1%
+- Standard email: 2-5%
+- With incentive: 5-10%
+- In-app/intercept: 100% (no email link)
 
-**Skip Logic Detection** ✅
-- Detects DisplayLogic / conditional questions
-- Adjusts score for reduced respondent burden
-- Example: 30 questions, 63% conditional → Score 9.6 (excellent)
+**Impact:** Low CTR has the biggest multiplier effect. Improving CTR from 2% to 5% cuts invitations needed by 60%.
 
-**What makes these features unique:**
-- Other tools (Qualtrics, SurveyMonkey) don't account for BIBD or skip logic
-- This tool scores actual respondent experience, not total question pool
+### Drop-off Rate
+
+**Typical ranges:**
+- Simple survey (<10 min): 15-20%
+- Standard survey (10-15 min): 20-30%
+- Complex survey (>15 min): 30-40%
+
+**Impact:** High drop-off compounds with low CTR. Both together create the overall conversion penalty.
+
+### Effect Size
+
+**What it means:**
+- **Small (0.2)**: Subtle difference, hard to detect, needs large sample
+- **Medium (0.5)**: Moderate difference, typical in research
+- **Large (0.8)**: Obvious difference, easier to detect, needs smaller sample
+
+**Be realistic:** Using "large" when your real effect is "small" leaves you underpowered.
+
+---
+
+## Visual Equation Explained
+
+The dashboard shows:
+
+```
+×20 (CTR) × ×1.43 (Drop-off) × 128 (Statistical) = 3,657 (Total)
+```
+
+**Reading this:**
+1. **×20 from CTR**: Only 5% click, so you need 20× more invitations than starters
+2. **×1.43 from Drop-off**: Only 70% complete, so you need 1.43× more starters than completions
+3. **128 from Statistical Power**: Your test needs 128 completed responses
+4. **= 3,657 Total**: Multiply all three together
+
+**The key insight:** Survey inefficiency (CTR and drop-off) amplifies your statistical requirement.
+
+---
 
 ## Project Structure
 
 ```
-survey-fatigue-audit/
+survey-power-planning/
+├── app.py                              # Main Streamlit dashboard
+├── src/power/
+│   ├── calculators/
+│   │   ├── means.py                   # t-tests, ANOVA
+│   │   ├── regression.py              # Regression, correlation
+│   │   ├── proportions.py             # Chi-square, proportions
+│   │   └── segments.py                # Segment analysis
+│   ├── visualizations/
+│   │   ├── power_curves.py            # Power vs sample plots
+│   │   └── sensitivity.py             # Sensitivity analysis
+│   ├── integrations/
+│   │   ├── dropoff.py                 # Survey funnel calculations
+│   │   └── optimizer.py               # Optimization suggestions
+│   └── agent.py                        # Conversational interface
 ├── notebooks/
-│   └── 01-load-and-analyze-survey.ipynb    # Main analysis notebook
-├── src/
-│   ├── parsers/
-│   │   └── qualtrics.py                    # QSF file parser
-│   └── analyzers/
-│       └── fatigue_scorer.py               # Scoring engine
-├── data/
-│   ├── sample-surveys/                     # Your QSF files go here
-│   └── outputs/                            # Generated reports
-├── requirements.txt
-├── CLAUDE.md                               # Project instructions
-└── README.md
+│   ├── 00-power-planning.ipynb        # Tutorial notebook
+│   └── 04-optimize-design.ipynb       # Integrated workflow
+├── tests/power/                        # Unit tests
+├── docs/                               # Additional documentation
+└── requirements.txt
 ```
-
-## Scoring Algorithm
-
-```
-Total Score = Base Load + Position Multiplier + Cluster Penalties + Loop Penalties - Skip Logic Bonus
-
-Where:
-- Base Load = Sum of cognitive load from all question types
-- Position Multiplier = Questions later in survey weighted higher
-  - Q1-10: 1.0x
-  - Q11-20: 1.2x
-  - Q21-30: 1.5x
-  - Q31+: 2.0x
-- Cluster Penalties = High-load questions grouped (3+ in sequence)
-- Loop Penalties = Iterations × Questions × Avg Load (heaviest penalty)
-- Skip Logic Bonus = Effective question count reduction
-```
-
-## Fatigue Hierarchy
-
-Question types ranked by cognitive load:
-
-| Question Type | Cognitive Load | Score |
-|---------------|----------------|-------|
-| Single choice | Low | 5 |
-| Slider | Low-Medium | 10 |
-| Multiple choice | Medium | 15 |
-| Text entry (short) | High | 25 |
-| Matrix/Grid | High | 30+ (×cells) |
-| Rank order | Very High | 35 |
-| Text entry (long) | Extreme | 50 |
-
-**Special case:** Questions in loops multiply their cognitive load by iteration count.
-
-## Real-World Examples
-
-### Example 1: Exemplary Design (Bold Claims, Score 2.3)
-
-**Survey structure:**
-- 58 questions total, 14 per respondent (BIBD)
-- Simple 2-choice questions (best-worst scaling)
-- 3-6 minute completion time
-
-**Why it scores so low (good):**
-- BIBD ensures respondents see subset of questions
-- Consistent, simple question format throughout
-- No loops, grids, or open-ended questions
-
-**Result:** 2.3% of maximum fatigue - near perfect
-
-### Example 2: Needs Optimization (Wise Business, Score 29.3)
-
-**Survey structure:**
-- 22 questions, 4-7 minutes
-- One 60-cell matrix grid (4 rows × 15 columns)
-- Some text entry questions clustered
-
-**Issues detected:**
-- 🔴 HIGH: 60-cell matrix grid (10 points)
-- 🟡 MEDIUM: Text entry questions clustered (9 points)
-
-**Recommendation:** Split the matrix grid → score drops to ~15-18
-
-### Example 3: Major Revisions Needed (Singapore, Score 69.0)
-
-**Survey structure:**
-- 145 questions, 20-32 minutes
-- 21% have skip logic (31 conditional)
-- Multiple matrix grids
-
-**Issues detected:**
-- Skip logic helps but insufficient coverage
-- Length alone is major fatigue factor
-- Will lose 25.6% of respondents
-
-**Recommendation:** Increase skip logic to 40-50% coverage OR cut 30-40 questions
 
 ---
 
-## Evidence Base
+## Requirements
 
-Built on peer-reviewed research:
+- Python 3.8+
+- streamlit
+- numpy
+- pandas
+- scipy
+- statsmodels
+- pingouin
+- plotly
 
-- **Krosnick (1991):** Satisficing theory - respondents take mental shortcuts when fatigued
-- **Galesic & Bosnjak (2009):** Drop-off probability increases exponentially with survey length
-- **Walr Study (n=1,000):** "Don't know" responses rose 50% by loop iteration 3
-- **Jeong et al. (2023):** Extra survey hour increases skip rate by 10-64%
-- **Cochran (1977):** Balanced incomplete block designs maintain statistical power with reduced burden
-
-**See `SCORING_SYSTEM_DEFENSE.md` for complete research citations and validation.**
+All dependencies listed in `requirements.txt`
 
 ---
 
-## Frequently Asked Questions
+## Optional: Use Jupyter Notebooks
 
-### Can I trust this score?
+Alternative to the dashboard - use notebooks for analysis:
 
-**Yes, with context.** The score is:
-- ✅ Built on 30+ years of peer-reviewed research
-- ✅ Validated against real surveys with known outcomes
-- ✅ Transparent and auditable (see the math in source code)
-- ✅ Calibrated against industry benchmarks (Pew, Qualtrics, AAPOR)
+```bash
+jupyter notebook
+```
 
-**Use it for:**
-- Relative comparisons (Survey A vs B)
-- Identifying major structural issues
-- Time and drop-off estimates (±20% accuracy)
-
-**Don't rely on it for:**
-- Question wording quality (use cognitive testing)
-- Exact drop-off predictions
-- Replacing pilot testing
-
-**Read `SCORING_SYSTEM_DEFENSE.md` for complete stakeholder defense.**
-
-### What if my survey gets a high score?
-
-**Don't panic.** High scores identify specific fixable issues:
-
-1. **Read the breakdown** - See which categories contribute most points
-2. **Check the issues** - Each issue has a specific recommendation
-3. **Fix the biggest contributors** - Usually 1-3 major issues drive the score
-4. **Re-run analysis** - See the improvement
-
-**Example:** Survey with score 52 had one 80-cell grid. Split the grid → score dropped to 28.
-
-### How accurate are the time estimates?
-
-**Generally within ±2 minutes.** Based on:
-- Question count × average time per question type
-- Adjusted for BIBD and skip logic
-- Validated against real survey completion data
-
-**Factors that affect accuracy:**
-- Respondent familiarity with topic
-- Incentives (incentivized = faster)
-- Device type (mobile = slower)
-
-### Does this work for non-Qualtrics surveys?
-
-**Currently:** Only Qualtrics .qsf files
-
-**Future:** Parsers can be added for:
-- SurveyMonkey
-- Typeform
-- Google Forms
-- LimeSurvey
-
-The scoring logic is platform-agnostic.
+Open `notebooks/00-power-planning.ipynb` for interactive examples.
 
 ---
 
 ## Contributing
 
-Found a bug or have a QSF file that doesn't parse correctly?
+Contributions welcome! Areas for improvement:
 
-**Open an issue with:**
-1. The QSF file (or sanitized version removing sensitive content)
-2. Expected vs actual behavior
-3. Error messages or incorrect scores
-
-**Pull requests welcome for:**
-- Additional platform parsers
-- Improved detection algorithms
-- Bug fixes
+- Additional statistical tests (SEM, multilevel models, etc.)
+- More visualization options
+- Export functionality (PDF reports)
+- Integration with survey platforms
 
 ---
 
 ## License
 
-MIT License - see LICENSE file for details.
+MIT License
 
-Research citations and methodology based on published peer-reviewed work.
+---
+
+## Citation
+
+If you use this tool in research:
+
+```bibtex
+@software{survey_power_planning,
+  title = {Survey & Statistical Power Planning Tool},
+  author = {Barker, Ted},
+  year = {2026},
+  url = {https://github.com/ted-barker/survey-power-planning}
+}
+```
+
+---
+
+## Contact
+
+Questions or feedback? Open an issue on GitHub.
