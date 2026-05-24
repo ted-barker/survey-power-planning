@@ -2371,18 +2371,29 @@ def show_integrated_dashboard():
             if "t-test" in test_type or test_type in ["Mann-Whitney U", "Wilcoxon"]:
                 effect_label = "Effect (d)"
                 effect_options = {"Small (0.2)": 0.2, "Medium (0.5)": 0.5, "Large (0.8)": 0.8}
+                effect_type = "d"
             elif test_type in ["ANOVA", "Kruskal-Wallis", "Friedman", "Segment Analysis"]:
                 effect_label = "Effect (f)"
                 effect_options = {"Small (0.1)": 0.1, "Medium (0.25)": 0.25, "Large (0.4)": 0.4}
+                effect_type = "f"
             elif "Regression" in test_type or test_type == "Correlation":
                 effect_label = "Effect (f²)"
                 effect_options = {"Small (0.02)": 0.02, "Medium (0.15)": 0.15, "Large (0.35)": 0.35}
+                effect_type = "f2"
             else:  # Chi-Square, Proportions
                 effect_label = "Effect (w)"
                 effect_options = {"Small (0.1)": 0.1, "Medium (0.3)": 0.3, "Large (0.5)": 0.5}
+                effect_type = "w"
 
-            # Initialize effect_select if not present
-            if 'effect_select' not in st.session_state:
+            # Initialize or reset effect_select when test type changes
+            if 'last_test_type' not in st.session_state:
+                st.session_state.last_test_type = test_type
+                st.session_state.effect_select = 1  # Default to Medium
+            elif st.session_state.last_test_type != test_type:
+                # Test type changed, reset to Medium
+                st.session_state.last_test_type = test_type
+                st.session_state.effect_select = 1
+            elif 'effect_select' not in st.session_state:
                 st.session_state.effect_select = 1  # Default to Medium
 
             # Effect size buttons (before selectbox)
