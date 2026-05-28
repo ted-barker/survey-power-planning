@@ -226,18 +226,6 @@ class QualtricsParser:
         qtype = payload.get("QuestionType", "")
         mapped_type = self.TYPE_MAPPING.get(qtype, qtype)
 
-        # Qualtrics encodes "check-all-that-apply" as QuestionType=MC with
-        # Selector=MAVR (multi-answer vertical) or MAHR (multi-answer horizontal).
-        # Treat these as MultipleAnswer rather than SingleAnswer.
-        if qtype == "MC" and selector in ("MAVR", "MAHR"):
-            mapped_type = "MultipleAnswer"
-
-        # Text entry: distinguish short (single-line) from long-form (multi-line/essay).
-        # Selector=SL=single line (short), ML=multi line, ESTB=essay text box,
-        # FORM=multi-field form. ML/ESTB/FORM = long open-ended → much higher load.
-        if qtype == "TE" and selector in ("ML", "ESTB", "FORM"):
-            mapped_type = "TextEntryLong"
-
         # Choices
         choices = []
         choice_order = payload.get("Choices", {})

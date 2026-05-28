@@ -101,32 +101,6 @@ From lowest to highest cognitive load:
 | 9 | Open-ended (long text) | Extreme | Highest effort |
 | 10 | **Looped blocks** | **Multiplied** | Each iteration = attention withdrawal |
 
-**Size-Based Escalation (item count matters):**
-- **Ranking >5 items** → severe pairwise comparison load (O(n²) mental comparisons). +8 load per extra item.
-- **Check-all-that-apply >5 options** → scanning + decision fatigue. +3 load per extra option.
-- **Matrix grids >35 cells** → high load; >50 cells = HIGH severity.
-
-**Long-form text detection:**
-- Qualtrics `TE` (text entry) is split by selector:
-  - `SL` (single line) → `TextEntry` (load 25)
-  - `ML` (multi line), `ESTB` (essay box), `FORM` (multi-field) → `TextEntryLong` (load 50)
-- Multi-line text boxes are essay questions and must be scored as long-form.
-
-**Check-all-that-apply detection:**
-- Qualtrics encodes CATA as `QuestionType=MC` with `Selector=MAVR`/`MAHR` (multi-answer vertical/horizontal).
-- Do NOT classify these as `SingleAnswer` — they are `MultipleAnswer` and trigger the >5-option size penalty.
-
-**Density Penalty (compounding HIGH issues):**
-- Structural HIGH-severity issues compound — respondents experience aggregate pain, not isolated incidents.
-- Penalty formula: `n × (n-1) × 2` where n = count of HIGH issues.
-  - 1 HIGH = 0 (ok-ish, every survey has rough edges)
-  - 2 HIGH = +4
-  - 3 HIGH = +12
-  - 4 HIGH = +24
-  - 5 HIGH = +40
-  - 6 HIGH = +60
-- Reported as its own "Density Penalty" category in the score breakdown.
-
 **Special Cases:**
 - Attention checks in loops = high risk of false failures
 - Open-ended questions in loops = fatigue accelerator
@@ -171,18 +145,13 @@ Each audit produces:
 Composite score calculated from multiple factors:
 
 ```
-Total Score = Base Load + Position Multiplier + Cluster Penalties + Loop Penalties
-            + Grid Complexity + Density Penalty - Skip Logic Bonus
+Total Score = Base Load + Position Multiplier + Cluster Penalties + Loop Penalties - Skip Logic Bonus
 
 Where:
-- Base Load = Sum of individual question cognitive load scores (with size-based escalation
-  for RankOrder >5 items and CATA >5 options)
+- Base Load = Sum of individual question cognitive load scores
 - Position Multiplier = Questions later in survey weighted higher (Q1-10: 1.0x, Q11-20: 1.2x, Q21-30: 1.5x, Q31+: 2.0x)
 - Cluster Penalties = High-load questions grouped together (3+ in sequence)
 - Loop Penalties = Iterations × questions × avg_load (heaviest penalty)
-- Grid Complexity = Matrix cells (rows × columns); >50 cells = HIGH severity
-- Density Penalty = n × (n-1) × 2 where n = count of HIGH-severity structural issues.
-  Compounds because respondents experience aggregate pain, not isolated incidents.
 - Skip Logic Bonus = Effective question count reduction
 ```
 

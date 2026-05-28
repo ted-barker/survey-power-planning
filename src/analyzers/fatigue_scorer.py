@@ -81,33 +81,6 @@ FATIGUE_HIERARCHY = {
     "Timing": 0,                # No load
 }
 
-# Item-count thresholds for size-based load escalation.
-# Above these counts, the question becomes disproportionately heavy:
-# - RankOrder is O(n^2) pairwise comparisons; >5 items = severe overload.
-# - MultipleAnswer (check-all-that-apply) >5 choices = scanning + decision fatigue.
-SIZE_THRESHOLDS = {
-    "RankOrder": 5,         # >5 items to rank → high cognitive load
-    "MultipleAnswer": 5,    # >5 options in CATA → high cognitive load
-}
-
-# Per-extra-item load increments (added on top of base hierarchy load).
-SIZE_LOAD_INCREMENTS = {
-    "RankOrder": 8,         # rank order grows quadratically
-    "MultipleAnswer": 3,    # check-all grows linearly with scanning
-}
-
-
-def question_load(q) -> float:
-    """Compute cognitive load for a question, with size-based escalation
-    for RankOrder (>5 items) and MultipleAnswer / check-all-that-apply (>5 options)."""
-    base = FATIGUE_HIERARCHY.get(q.type, 10)
-    threshold = SIZE_THRESHOLDS.get(q.type)
-    if threshold is not None:
-        n_items = len(q.choices)
-        if n_items > threshold:
-            base += (n_items - threshold) * SIZE_LOAD_INCREMENTS[q.type]
-    return base
-
 # Position multipliers (questions later in survey = higher fatigue)
 POSITION_MULTIPLIERS = [
     (0, 10, 1.0),    # Q1-10: baseline
@@ -214,11 +187,11 @@ class FatigueScorer:
         """
         self.survey = survey
         self.report = FatigueReport(survey_name=survey.name)
-        self.report.total_questions = len(survey.questions)
 
         # Use effective questions if BIBD detected
         if survey.uses_bibd and survey.effective_questions:
             self.report.uses_bibd = True
+            self.report.total_questions = len(survey.questions)
             self.report.effective_questions = survey.effective_questions
 
         # Calculate each component
@@ -241,12 +214,6 @@ class FatigueScorer:
             skip_logic_bonus
         )
 
-        # Density penalty: structural HIGH issues compound. 1 is ok-ish, but
-        # each additional HIGH issue escalates the risk progressively.
-        # Quadratic-ish growth so 2→3→4→5→6 jumps get bigger each step.
-        density_penalty = self._calculate_density_penalty()
-        total_score += density_penalty
-
         # Cap at 100
         self.report.total_score = min(total_score, 100.0)
         self.report.risk_level = self.report.get_risk_level()
@@ -262,34 +229,6 @@ class FatigueScorer:
 
         return self.report
 
-    def _calculate_density_penalty(self) -> float:
-        """Progressive penalty for stacking HIGH-severity structural issues.
-
-        1 HIGH issue is ok-ish (every survey has rough edges). Beyond that,
-        each additional HIGH compounds: respondents experience aggregate pain,
-        not isolated incidents. Penalty grows quadratically (n*(n-1)*k) so
-        2→3→4→5 each hurts more than the last.
-        """
-        n_high = sum(1 for i in self.report.issues if i.severity == "HIGH")
-        if n_high <= 1:
-            penalty = 0.0
-        else:
-            # n=2 → 4, n=3 → 12, n=4 → 24, n=5 → 40, n=6 → 60
-            penalty = n_high * (n_high - 1) * 2.0
-
-        # Record as its own category so the user can see it in the breakdown
-        self.report.category_scores.append(CategoryScore(
-            name="Density Penalty",
-            points=penalty,
-            description=(
-                f"{n_high} HIGH-severity structural issues — compounding fatigue"
-                if n_high >= 2 else
-                f"{n_high} HIGH-severity issue (no compounding penalty)"
-            ),
-            issues=[],
-        ))
-        return penalty
-
     def _calculate_base_load(self) -> float:
         """Calculate base cognitive load from question types."""
         total_load = 0.0
@@ -300,29 +239,19 @@ class FatigueScorer:
         questions_to_score = self.survey.questions
 
         for q in questions_to_score:
-            load = question_load(q)
+            load = FATIGUE_HIERARCHY.get(q.type, 10)
             total_load += load
 
             # Flag high-load questions
             if load >= 30:
-                # Build a description that calls out size-driven escalation
-                desc = f"{q.type} question with high cognitive load"
-                rec = f"Consider simplifying or removing this {q.type} question"
-                if q.type == "RankOrder" and len(q.choices) > SIZE_THRESHOLDS["RankOrder"]:
-                    desc = f"RankOrder with {len(q.choices)} items (>5 = severe pairwise comparison load)"
-                    rec = "Reduce to ≤5 items, or split into multiple smaller rankings"
-                elif q.type == "MultipleAnswer" and len(q.choices) > SIZE_THRESHOLDS["MultipleAnswer"]:
-                    desc = f"Check-all-that-apply with {len(q.choices)} options (>5 = scanning fatigue)"
-                    rec = "Reduce to ≤5 options, or split into grouped sub-questions"
-
                 issues.append(Issue(
                     severity="MEDIUM" if load < 40 else "HIGH",
                     category="HighLoad",
                     question_id=q.id,
                     position=q.position + 1,
-                    description=desc,
+                    description=f"{q.type} question with high cognitive load",
                     impact=load,
-                    recommendation=rec,
+                    recommendation=f"Consider simplifying or removing this {q.type} question"
                 ))
 
         # If BIBD, adjust load based on effective questions
@@ -367,7 +296,7 @@ class FatigueScorer:
         issues = []
 
         for q in self.survey.questions:
-            base_load = question_load(q)
+            base_load = FATIGUE_HIERARCHY.get(q.type, 10)
 
             # Get position multiplier
             multiplier = 1.0
@@ -429,7 +358,7 @@ class FatigueScorer:
                 continue
 
             # Calculate average load per iteration
-            avg_load = sum(question_load(q) for q in loop_questions) / len(loop_questions)
+            avg_load = sum(FATIGUE_HIERARCHY.get(q.type, 10) for q in loop_questions) / len(loop_questions)
 
             # Penalty = iterations × questions × avg_load
             penalty = loop.iterations * len(loop_questions) * avg_load / 10
@@ -488,7 +417,7 @@ class FatigueScorer:
         cluster_start = None
 
         for i, q in enumerate(self.survey.questions):
-            load = question_load(q)
+            load = FATIGUE_HIERARCHY.get(q.type, 10)
 
             if load >= 25:  # High load threshold
                 if cluster_start is None:
